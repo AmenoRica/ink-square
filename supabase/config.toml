@@ -1,0 +1,4 @@
+project_id = "ink-square"
+
+[functions.turn-credentials]
+verify_jwt = false

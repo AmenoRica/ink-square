@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { InklingVoiceEngine, type VoiceSettings } from '@/lib/audio/inkling-engine';
 import { createProfile, scrambleMessage, type Profile, type VoicePreset } from '@/lib/chat';
+import { fallbackIceServers, loadIceServers } from '@/lib/turn';
 
 type Member = Profile & { id: string; voiceChannel: number | null };
 type ChatMessage = Pick<Member, 'id' | 'nickname' | 'color'> & { messageId: string; content: string; createdAt: number };
@@ -16,7 +17,6 @@ type SignalKind = 'chat' | 'voice';
 type SignalData = RTCSessionDescriptionInit | RTCIceCandidateInit;
 const baseSettings: VoiceSettings = { voiceStyle: 'balanced', excited: false, characterPitch: 15, obscurity: 88, chop: 92, jitter: 0, crush: 0, bubbles: 48, invention: 78, wet: 100, volume: 72, monitorOriginal: false, voiceIsolation: true };
 const channels = [1, 2, 3, 4];
-const iceServers: RTCIceServer[] = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:53', 'stun:stun.l.google.com:19302'] }];
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -40,6 +40,7 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState('');
   const [connection, setConnection] = useState<'connecting' | 'online' | 'offline'>(supabaseUrl && supabaseKey ? 'connecting' : 'offline');
+  const [iceReady, setIceReady] = useState(!supabaseUrl || !supabaseKey);
   const [voiceChannel, setVoiceChannel] = useState<number | null>(null);
   const [voiceStatus, setVoiceStatus] = useState<'idle' | 'starting' | 'live' | 'error'>('idle');
   const [muted, setMuted] = useState(false);
@@ -53,6 +54,7 @@ export default function Home() {
   const chatPeers = useRef(new Map<string, { pc: RTCPeerConnection; channel?: RTCDataChannel }>());
   const voicePeers = useRef(new Map<string, RTCPeerConnection>());
   const pendingCandidates = useRef(new Map<string, RTCIceCandidateInit[]>());
+  const iceServers = useRef(fallbackIceServers);
   const messagesEnd = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -69,6 +71,15 @@ export default function Home() {
   useEffect(() => { profileRef.current = profile; }, [profile]);
   useEffect(() => { voiceChannelRef.current = voiceChannel; }, [voiceChannel]);
   useEffect(() => { messagesEnd.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    let active = true;
+    if (!supabaseUrl || !supabaseKey) return;
+    void loadIceServers(supabaseUrl, supabaseKey)
+      .then((servers) => { if (active) iceServers.current = servers; })
+      .catch(() => undefined)
+      .finally(() => { if (active) setIceReady(true); });
+    return () => { active = false; };
+  }, []);
 
   const trackPresence = (overrides: Partial<Member> = {}) => {
     const current = profileRef.current;
@@ -102,7 +113,7 @@ export default function Home() {
     if (kind === 'chat') {
       const existing = chatPeers.current.get(peerId);
       if (existing) return existing.pc;
-      const pc = new RTCPeerConnection({ iceServers });
+      const pc = new RTCPeerConnection({ iceServers: iceServers.current });
       chatPeers.current.set(peerId, { pc });
       if (initiator) bindDataChannel(peerId, pc.createDataChannel('ink-chat'));
       pc.ondatachannel = (event) => bindDataChannel(peerId, event.channel);
@@ -112,7 +123,7 @@ export default function Home() {
     }
     const existing = voicePeers.current.get(peerId);
     if (existing) return existing;
-    const pc = new RTCPeerConnection({ iceServers });
+    const pc = new RTCPeerConnection({ iceServers: iceServers.current });
     outputStream.current?.getAudioTracks().forEach((track) => pc.addTrack(track, outputStream.current!));
     pc.onicecandidate = (event) => { if (event.candidate) sendSignal('voice', peerId, event.candidate.toJSON()); };
     pc.ontrack = (event) => setRemoteStreams((current) => new Map(current).set(peerId, event.streams[0] ?? new MediaStream([event.track])));
@@ -149,7 +160,7 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (!clientId) return;
+    if (!clientId || !iceReady) return;
     if (!supabaseUrl || !supabaseKey) return;
     const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     const room = supabase.channel('ingscord:v1', { config: { broadcast: { self: false }, presence: { key: clientId } } });
@@ -176,7 +187,7 @@ export default function Home() {
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') setConnection('offline');
       });
     return () => { realtime.current = null; void supabase.removeChannel(room); };
-  }, [clientId]);
+  }, [clientId, iceReady]);
 
   useEffect(() => () => {
     chatPeers.current.forEach(({ pc }) => pc.close());

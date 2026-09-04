@@ -27,7 +27,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint && npm run check:chat && npm run check:dsp && npm run build
+      - run: npm run lint && npm run check:chat && npm run check:turn && npm run check:dsp && npm run build
         env:
           VITE_SUPABASE_URL: https://pnyjltcjvsrpqskcojhx.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}

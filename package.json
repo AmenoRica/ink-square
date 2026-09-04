@@ -12,6 +12,7 @@
     "start": "vite preview",
     "lint": "oxlint",
     "check:chat": "node --experimental-strip-types scripts/check-chat.ts",
+    "check:turn": "node --experimental-strip-types scripts/check-turn.ts",
     "check:dsp": "node scripts/check-processor.mjs",
     "format": "oxfmt"
   },
