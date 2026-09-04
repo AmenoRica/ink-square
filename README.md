@@ -47,13 +47,8 @@ npm run build
 
 음절 뱅크는 GPL-3.0-or-later인 [eSpeak NG](https://github.com/espeak-ng/espeak-ng)의 출력으로 만들며, `npm run build:voice-bank`로 다시 생성할 수 있습니다.
 
-## WebRTC 확장 포인트
+## 온라인 연결
 
-`InklingVoiceEngine.getOutputStream()`이 변조가 끝난 `MediaStream`을 반환합니다. 통화 기능을 추가할 때 이 트랙을 그대로 피어 연결에 넣으면 됩니다.
+Supabase Realtime의 `ingscord:v1` Presence/Broadcast 채널은 접속자 목록과 WebRTC 연결 협상에만 사용합니다. 채팅과 변조된 음성은 피어끼리 직접 전송하며 서버와 데이터베이스에는 저장하지 않습니다.
 
-```ts
-const stream = engine.getOutputStream();
-stream?.getAudioTracks().forEach((track) => peerConnection.addTrack(track, stream));
-```
-
-시그널링, 방 입장, ICE 서버 설정은 음성 엔진과 분리해 별도 모듈에서 구성하면 됩니다. 원격 음성은 별도 `<audio autoplay>` 요소로 재생해야 로컬 모니터와 통화 소리가 섞이지 않습니다.
+로컬 실행에는 `VITE_SUPABASE_URL`과 `VITE_SUPABASE_PUBLISHABLE_KEY`가 필요합니다. GitHub Pages 배포는 `.github/workflows/deploy-pages.yml`에서 같은 공개 설정을 빌드에 주입합니다.

@@ -173,9 +173,10 @@ export class InklingVoiceEngine {
 
   private async createEffect(context: AudioContext) {
     try {
-      await context.audioWorklet.addModule('/inkling-processor.js');
+      const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+      await context.audioWorklet.addModule(`${basePath}/inkling-processor.js`);
       const node = new AudioWorkletNode(context, 'inkling-voice-processor');
-      const [bankResponse, modelResponse] = await Promise.all([fetch('/espeak-bank.json'), fetch('/city-postfilter.json')]);
+      const [bankResponse, modelResponse] = await Promise.all([fetch(`${basePath}/espeak-bank.json`), fetch(`${basePath}/city-postfilter.json`)]);
       if (!bankResponse.ok || !modelResponse.ok) throw new Error('voice assets unavailable');
       const bank = await bankResponse.json() as { sampleRate: number; items: Record<string, { pcm: string; pitch: number; loopStart: number; loopEnd: number }> };
       const model = await modelResponse.json() as Record<string, unknown>;
