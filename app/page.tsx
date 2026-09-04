@@ -15,7 +15,7 @@ type Member = Profile & { id: string; voiceChannel: number | null };
 type ChatMessage = Pick<Member, 'id' | 'nickname' | 'color'> & { messageId: string; content: string; createdAt: number };
 type SignalKind = 'chat' | 'voice';
 type SignalData = RTCSessionDescriptionInit | RTCIceCandidateInit;
-const baseSettings: VoiceSettings = { voiceStyle: 'balanced', excited: false, characterPitch: 15, obscurity: 88, chop: 92, jitter: 0, crush: 0, bubbles: 48, invention: 78, wet: 100, volume: 72, monitorOriginal: false, voiceIsolation: true };
+const baseSettings: VoiceSettings = { voiceStyle: 'balanced', excited: false, characterPitch: 15, obscurity: 88, chop: 92, jitter: 0, crush: 0, bubbles: 48, invention: 78, volume: 72, monitorOriginal: false, voiceIsolation: true };
 const channels = [1, 2, 3, 4];
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -219,7 +219,7 @@ export default function Home() {
     try {
       await next.start();
       engine.current = next;
-      outputStream.current = next.getOutputStream() ?? null;
+      outputStream.current = next.getOutputStream();
       voiceChannelRef.current = channel;
       setVoiceChannel(channel);
       setVoiceStatus('live');

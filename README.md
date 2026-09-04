@@ -43,7 +43,7 @@ npm run build
 - `scripts/build-espeak-bank.mjs`: 음절 뱅크와 피치 동기 루프 재생성 도구
 - `scripts/train-city-postfilter.py`: 분리된 보컬 WAV로 작은 후처리 필터를 다시 학습하는 도구
 
-맨 앞단의 RNNoise는 가벼운 신경망으로 생활소음과 타건음을 억제하며 WASM AudioWorklet에서 로컬 실행됩니다. 서버나 API 키는 필요 없습니다. RNNoise를 불러오지 못하면 브라우저 내장 잡음 억제로 자동 전환합니다. 그 뒤의 음높이 신뢰도와 유성음 유지 판정도 비주기성 충격음이 캐릭터 음절을 잘못 생성하지 않도록 한 번 더 거릅니다. 다만 말소리와 동시에 아주 가깝고 크게 녹음된 타건음은 완전히 없어지지 않을 수 있습니다. 캐릭터 AudioWorklet을 불러오지 못하는 구형 환경에서는 ScriptProcessor 기반 간이 효과로 자동 전환됩니다. 녹음은 브라우저별 MediaRecorder 형식 차이를 피하기 위해 모노 WAV로 저장합니다.
+맨 앞단의 RNNoise는 가벼운 신경망으로 생활소음과 타건음을 억제하며 WASM AudioWorklet에서 로컬 실행됩니다. 서버나 API 키는 필요 없습니다. RNNoise를 불러오지 못하면 브라우저 내장 잡음 억제로 자동 전환합니다. 그 뒤의 음높이 신뢰도와 유성음 유지 판정도 비주기성 충격음이 캐릭터 음절을 잘못 생성하지 않도록 한 번 더 거릅니다. 다만 말소리와 동시에 아주 가깝고 크게 녹음된 타건음은 완전히 없어지지 않을 수 있습니다. 캐릭터 AudioWorklet이나 필수 음성 자료를 불러오지 못하면 원음이 전송되지 않도록 음성 연결을 중단합니다. 녹음은 브라우저별 MediaRecorder 형식 차이를 피하기 위해 모노 WAV로 저장합니다.
 
 음절 뱅크는 GPL-3.0-or-later인 [eSpeak NG](https://github.com/espeak-ng/espeak-ng)의 출력으로 만들며, `npm run build:voice-bank`로 다시 생성할 수 있습니다.
 

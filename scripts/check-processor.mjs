@@ -186,3 +186,8 @@ for (let block = 0; block < 40; block += 1) {
   for (const sample of rendered) quietPeak = Math.max(quietPeak, Math.abs(sample));
 }
 assert.ok(bankPeak > quietPeak * 1.7, 'generated syllable volume should follow the input speech envelope');
+
+const engineSource = await readFile(new URL('../lib/audio/inkling-engine.ts', import.meta.url), 'utf8');
+assert.doesNotMatch(engineSource, /createFallbackEffect|connect\(this\.dry\)/, 'calls must not have a raw-voice fallback path');
+assert.match(engineSource, /if \(!this\.output\) throw new Error\('voice obfuscation is not ready'\)/, 'calls must require a ready obfuscated stream');
+assert.ok(engineSource.indexOf('this.output = context.createMediaStreamDestination()') > engineSource.indexOf('this.effect = await this.createEffect(context)'), 'the call stream must be created only after obfuscation is ready');

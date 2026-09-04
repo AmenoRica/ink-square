@@ -10,7 +10,6 @@ export type VoiceSettings = {
   crush: number;
   bubbles: number;
   invention: number;
-  wet: number;
   volume: number;
   monitorOriginal: boolean;
   voiceIsolation: boolean;
@@ -26,7 +25,6 @@ const defaultSettings: VoiceSettings = {
   crush: 0,
   bubbles: 48,
   invention: 78,
-  wet: 100,
   volume: 72,
   monitorOriginal: false,
   voiceIsolation: true,
@@ -41,11 +39,9 @@ export class InklingVoiceEngine {
   private noiseSuppressionMode = 'RNNoise 음성 정리';
   private highpass?: BiquadFilterNode;
   private lowpass?: BiquadFilterNode;
-  private compressor?: DynamicsCompressorNode;
   private effect?: AudioNode;
   private mouthFilter?: BiquadFilterNode;
   private mouthResonance?: BiquadFilterNode;
-  private dry?: GainNode;
   private wet?: GainNode;
   private rawMonitor?: GainNode;
   private master?: GainNode;
@@ -94,20 +90,13 @@ export class InklingVoiceEngine {
     this.lowpass.type = 'lowpass';
     this.lowpass.frequency.value = 7200;
     this.lowpass.Q.value = 0.6;
-    this.compressor = context.createDynamicsCompressor();
-    this.compressor.threshold.value = -34;
-    this.compressor.knee.value = 18;
-    this.compressor.ratio.value = 4;
-    this.compressor.attack.value = 0.004;
-    this.compressor.release.value = 0.16;
-    this.dry = context.createGain();
     this.wet = context.createGain();
     this.rawMonitor = context.createGain();
     this.master = context.createGain();
-    this.output = context.createMediaStreamDestination();
     this.analyser = context.createAnalyser();
     this.analyser.fftSize = 1024;
     this.effect = await this.createEffect(context);
+    this.output = context.createMediaStreamDestination();
     this.mouthFilter = context.createBiquadFilter();
     this.mouthFilter.type = 'lowpass';
     this.mouthFilter.frequency.value = 3200;
@@ -121,7 +110,6 @@ export class InklingVoiceEngine {
     const microphoneInput = await this.createNoiseSuppressor(context, this.source, stream);
     let cleanVoice: AudioNode = microphoneInput.connect(this.highpass);
     cleanVoice = cleanVoice.connect(this.lowpass);
-    cleanVoice.connect(this.compressor).connect(this.dry).connect(this.master);
     cleanVoice.connect(this.effect).connect(this.mouthFilter).connect(this.mouthResonance).connect(this.wet).connect(this.master);
     microphoneInput.connect(this.rawMonitor).connect(context.destination);
     this.master.connect(this.analyser);
@@ -172,65 +160,19 @@ export class InklingVoiceEngine {
   }
 
   private async createEffect(context: AudioContext) {
-    try {
-      const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-      await context.audioWorklet.addModule(`${basePath}/inkling-processor.js`);
-      const node = new AudioWorkletNode(context, 'inkling-voice-processor');
-      const [bankResponse, modelResponse] = await Promise.all([fetch(`${basePath}/espeak-bank.json`), fetch(`${basePath}/city-postfilter.json`)]);
-      if (!bankResponse.ok || !modelResponse.ok) throw new Error('voice assets unavailable');
-      const bank = await bankResponse.json() as { sampleRate: number; items: Record<string, { pcm: string; pitch: number; loopStart: number; loopEnd: number }> };
-      const model = await modelResponse.json() as Record<string, unknown>;
-      const items = Object.entries(bank.items).map(([token, item]) => {
-        const bytes = Uint8Array.from(atob(item.pcm), (character) => character.charCodeAt(0));
-        return { token, samples: bytes.buffer, pitch: item.pitch, loopStart: item.loopStart, loopEnd: item.loopEnd };
-      });
-      node.port.postMessage({ type: 'sample-bank', sampleRate: bank.sampleRate, items }, items.map(({ samples }) => samples));
-      node.port.postMessage({ type: 'post-filter', value: model });
-      return node;
-    } catch {
-      return this.createFallbackEffect(context);
-    }
-  }
-
-  private createFallbackEffect(context: AudioContext) {
-    const node = context.createScriptProcessor(1024, 1, 1);
-    const ring = new Float32Array(32768);
-    let write = 0;
-    let read = 0;
-    let hold = 0;
-    let held = 0;
-
-    node.onaudioprocess = (event) => {
-      const input = event.inputBuffer.getChannelData(0);
-      const output = event.outputBuffer.getChannelData(0);
-      const ratio = 2 ** (this.settings.characterPitch / 12);
-      const crush = this.settings.crush / 100;
-      const bubbles = this.settings.bubbles / 100;
-      const bits = 16 - crush * 11;
-      const steps = 2 ** bits;
-      const holdFor = 1 + Math.floor(crush * 7);
-
-      for (let i = 0; i < input.length; i += 1) {
-        const gated = this.settings.voiceIsolation && Math.abs(input[i]) < 0.007 ? input[i] * 0.08 : input[i];
-        ring[write] = gated;
-        write = (write + 1) % ring.length;
-        if (read === 0) read = (write - 2400 + ring.length) % ring.length;
-        const a = Math.floor(read);
-        const b = (a + 1) % ring.length;
-        const shifted = ring[a] + (ring[b] - ring[a]) * (read - a);
-        read = (read + ratio + (Math.random() - 0.5) * this.settings.jitter * 0.0008) % ring.length;
-        if ((write - read + ring.length) % ring.length < 600) {
-          read = (write - 2400 - Math.random() * this.settings.obscurity * 18 + ring.length) % ring.length;
-        }
-        if (hold-- <= 0) {
-          held = Math.round(shifted * steps) / steps;
-          hold = holdFor;
-        }
-        const drive = 1 + crush * 8;
-        const wobble = 0.94 + Math.sin((i + write) * 0.009) * bubbles * 0.06;
-        output[i] = Math.tanh(held * drive) / Math.tanh(drive) * wobble;
-      }
-    };
+    const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+    await context.audioWorklet.addModule(`${basePath}/inkling-processor.js`);
+    const node = new AudioWorkletNode(context, 'inkling-voice-processor');
+    const [bankResponse, modelResponse] = await Promise.all([fetch(`${basePath}/espeak-bank.json`), fetch(`${basePath}/city-postfilter.json`)]);
+    if (!bankResponse.ok || !modelResponse.ok) throw new Error('voice assets unavailable');
+    const bank = await bankResponse.json() as { sampleRate: number; items: Record<string, { pcm: string; pitch: number; loopStart: number; loopEnd: number }> };
+    const model = await modelResponse.json() as Record<string, unknown>;
+    const items = Object.entries(bank.items).map(([token, item]) => {
+      const bytes = Uint8Array.from(atob(item.pcm), (character) => character.charCodeAt(0));
+      return { token, samples: bytes.buffer, pitch: item.pitch, loopStart: item.loopStart, loopEnd: item.loopEnd };
+    });
+    node.port.postMessage({ type: 'sample-bank', sampleRate: bank.sampleRate, items }, items.map(({ samples }) => samples));
+    node.port.postMessage({ type: 'post-filter', value: model });
     return node;
   }
 
@@ -248,10 +190,8 @@ export class InklingVoiceEngine {
     this.mouthResonance?.frequency.setTargetAtTime(style.resonance, context.currentTime, 0.03);
     this.mouthResonance?.Q.setTargetAtTime(style.q, context.currentTime, 0.03);
     this.mouthResonance?.gain.setTargetAtTime(style.gain, context.currentTime, 0.03);
-    const wet = this.settings.wet / 100;
     const volume = this.settings.volume / 100;
-    this.wet?.gain.setTargetAtTime(Math.sin(wet * Math.PI * 0.5) * volume, context.currentTime, 0.015);
-    this.dry?.gain.setTargetAtTime(Math.cos(wet * Math.PI * 0.5) * volume, context.currentTime, 0.015);
+    this.wet?.gain.setTargetAtTime(volume, context.currentTime, 0.015);
     this.rawMonitor?.gain.setTargetAtTime(this.settings.monitorOriginal ? volume * 0.55 : 0, context.currentTime, 0.015);
     if (this.effect instanceof AudioWorkletNode) {
       this.effect.port.postMessage({ type: 'settings', value: this.settings });
@@ -278,9 +218,9 @@ export class InklingVoiceEngine {
     return encodeWav(samples, this.context.sampleRate);
   }
 
-  /** Processed MediaStreamTrack entry point for the future RTCPeerConnection. */
   getOutputStream() {
-    return this.output?.stream;
+    if (!this.output) throw new Error('voice obfuscation is not ready');
+    return this.output.stream;
   }
 
   async stop() {
@@ -295,12 +235,10 @@ export class InklingVoiceEngine {
     this.noiseSuppressionMode = 'RNNoise 음성 정리';
     this.highpass = undefined;
     this.lowpass = undefined;
-    this.compressor = undefined;
     this.effect = undefined;
     this.mouthFilter = undefined;
     this.mouthResonance = undefined;
     this.analyser = undefined;
-    this.dry = undefined;
     this.wet = undefined;
     this.rawMonitor = undefined;
     this.master = undefined;
