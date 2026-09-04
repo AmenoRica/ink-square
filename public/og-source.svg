@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#6529ff" stop-opacity=".38" />
+      <stop offset="1" stop-color="#10121c" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#8b5cf6" />
+      <stop offset="1" stop-color="#5b21b6" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#10121c" />
+  <rect width="1200" height="630" fill="url(#glow)" />
+  <circle cx="154" cy="118" r="7" fill="#28d9ff" />
+  <circle cx="1034" cy="494" r="10" fill="#8b5cf6" opacity=".72" />
+  <circle cx="1084" cy="166" r="5" fill="#28d9ff" opacity=".72" />
+  <path d="M65 489c72-64 119-63 174 4s109 73 178 7" fill="none" stroke="url(#ink)" stroke-width="16" stroke-linecap="round" opacity=".18" />
+  <path d="M789 133c60 51 117 53 171 6s105-49 175 12" fill="none" stroke="#28d9ff" stroke-width="12" stroke-linecap="round" opacity=".1" />
+  <image href="brand-mark.png" x="371" y="32" width="458" height="458" />
+  <text x="600" y="550" fill="#ffffff" font-family="Splatoon, Arial Rounded MT Bold, sans-serif" font-size="72" font-weight="800" text-anchor="middle" letter-spacing="-2">잉스코드</text>
+  <text x="600" y="592" fill="#b5bac1" font-family="Arial, sans-serif" font-size="22" font-weight="600" text-anchor="middle" letter-spacing="4">INKLING VOICE CHAT</text>
+</svg>
